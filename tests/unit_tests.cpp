@@ -65,6 +65,30 @@ void test_parsing_and_authorization() {
   tcp.connections = tcp.limits.concurrency + 1;
   check_throws([&] { netbench::validate(tcp); });
 
+  auto high_limit_tcp = base(netbench::Command::tcp);
+  high_limit_tcp.port = 443;
+  high_limit_tcp.connections = netbench::SafetyLimits::absolute_concurrency;
+  high_limit_tcp.connection_rate =
+      netbench::SafetyLimits::absolute_connection_rate;
+  high_limit_tcp.duration = netbench::SafetyLimits::absolute_duration;
+  high_limit_tcp.limits.concurrency =
+      netbench::SafetyLimits::absolute_concurrency;
+  high_limit_tcp.limits.connection_rate =
+      netbench::SafetyLimits::absolute_connection_rate;
+  high_limit_tcp.limits.duration = netbench::SafetyLimits::absolute_duration;
+  netbench::validate(high_limit_tcp);
+
+  auto high_limit_udp = base(netbench::Command::udp);
+  high_limit_udp.port = 9000;
+  high_limit_udp.pps = netbench::SafetyLimits::absolute_pps;
+  high_limit_udp.payload_size = 1000;
+  high_limit_udp.bandwidth_bytes_per_second =
+      netbench::SafetyLimits::absolute_bandwidth_bytes_per_second;
+  high_limit_udp.limits.pps = netbench::SafetyLimits::absolute_pps;
+  high_limit_udp.limits.bandwidth_bytes_per_second =
+      netbench::SafetyLimits::absolute_bandwidth_bytes_per_second;
+  netbench::validate(high_limit_udp);
+
   auto udp = base(netbench::Command::udp);
   udp.port = 9000;
   udp.pps = 1000;

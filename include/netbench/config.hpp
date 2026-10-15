@@ -14,12 +14,12 @@ enum class Command { tcp, udp, icmp, validate_source, help, version };
 enum class Profile { baseline, sustained, ramp, burst };
 
 struct SafetyLimits {
-  static constexpr std::uint64_t absolute_pps = 1'000'000;
+  static constexpr std::uint64_t absolute_pps = 10'000'000;
   static constexpr std::uint64_t absolute_bandwidth_bytes_per_second =
-      1'250'000'000ULL;
-  static constexpr std::uint64_t absolute_connection_rate = 10'000;
-  static constexpr std::uint32_t absolute_concurrency = 4096;
-  static constexpr auto absolute_duration = std::chrono::seconds{300};
+      12'500'000'000ULL;
+  static constexpr std::uint64_t absolute_connection_rate = 100'000;
+  static constexpr std::uint32_t absolute_concurrency = 65'536;
+  static constexpr auto absolute_duration = std::chrono::hours{1};
 
   std::uint64_t pps{100'000};
   std::uint64_t bandwidth_bytes_per_second{125'000'000};

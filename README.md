@@ -93,10 +93,11 @@ local submissions and locally visible ICMP observations separate and marks exter
 false unless a separate observer establishes the result; NetBench does not provide such an
 observer.
 
-Defaults cap each run at 100,000 PPS, 1 Gbps, 1,000 connections/s, 1,024 concurrent connections,
-and 60 seconds. `--max-*` options may lower those runtime limits or raise them only as far as the
-compiled ceilings: 1,000,000 PPS, 10 Gbps, 10,000 connections/s, 4,096 concurrent connections, and
-300 seconds. Burst duration cannot exceed 10 seconds.
+Defaults cap each normal, non-spoofed run at 100,000 PPS, 1 Gbps, 1,000 connections/s, 1,024
+concurrent connections, and 60 seconds. `--max-*` options may lower those runtime limits or raise
+them only as far as the compiled ceilings: 10,000,000 PPS, 100 Gbps, 100,000 connections/s, 65,536
+concurrent connections, and one hour. Burst duration cannot exceed 10 seconds. The separate
+`validate-source` ceilings remain 10 PPS, 30 seconds, and 300 probes.
 
 Use NetBench only on systems and networks you own or are authorized to test. It deliberately omits
 general-purpose source spoofing, source rotation, reflection/amplification behavior, spoofed TCP,
