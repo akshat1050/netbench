@@ -35,7 +35,6 @@ netbench::Config base(netbench::Command command) {
   netbench::Config config;
   config.command = command;
   config.target = "127.0.0.1";
-  config.allowlist.push_back(netbench::CidrV4::parse("127.0.0.0/8"));
   return config;
 }
 
@@ -83,25 +82,28 @@ void test_parsing_and_authorization() {
                  0.55) < 0.0001);
 
   const auto tcp_cli =
-      parse({"netbench", "tcp", "--target", "192.0.2.10", "--allow-cidr",
-             "192.0.2.0/24", "--port", "443", "--connections", "100", "--rate",
-             "50cps", "--duration", "30s"});
+      parse({"netbench", "tcp", "--target", "8.8.8.8", "--port", "443",
+             "--connections", "100", "--rate", "50cps", "--duration", "30s"});
   CHECK(tcp_cli.command == netbench::Command::tcp);
+  CHECK(tcp_cli.target == "8.8.8.8");
+  CHECK(tcp_cli.allowlist.empty());
   CHECK(tcp_cli.connections == 100);
   CHECK(tcp_cli.connection_rate == 50);
 
   const auto udp_cli =
-      parse({"netbench", "udp", "--target", "192.0.2.10", "--allow-cidr",
-             "192.0.2.0/24", "--port", "9000", "--pps", "1000", "--size", "512",
-             "--duration", "30s"});
+      parse({"netbench", "udp", "--target", "1.1.1.1", "--port", "9000",
+             "--pps", "1000", "--size", "512", "--duration", "30s"});
   CHECK(udp_cli.command == netbench::Command::udp);
   CHECK(udp_cli.pps == 1000);
 
-  const auto icmp_cli =
-      parse({"netbench", "icmp", "--target", "192.0.2.10", "--allow-cidr",
-             "192.0.2.0/24", "--rate", "10pps", "--duration", "30s"});
+  const auto icmp_cli = parse({"netbench", "icmp", "--target", "9.9.9.9",
+                               "--rate", "10pps", "--duration", "30s"});
   CHECK(icmp_cli.command == netbench::Command::icmp);
   CHECK(icmp_cli.payload_size == 56);
+  check_throws([] {
+    (void)parse({"netbench", "tcp", "--target", "8.8.8.8", "--port", "443",
+                 "--allow-cidr", "8.8.8.8/32"});
+  });
   check_throws([] { (void)parse({"netbench", "receive"}); });
 }
 

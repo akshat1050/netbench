@@ -297,9 +297,6 @@ Config parse_command_line(int argc, char **argv) {
       config.payload_size = static_cast<std::size_t>(value);
     } else if (option == "--profile") {
       config.profile = parse_profile(require_value(index, argc, argv, option));
-    } else if (option == "--allow-cidr") {
-      config.allowlist.push_back(
-          CidrV4::parse(require_value(index, argc, argv, option)));
     } else if (option == "--json") {
       config.json_path = require_value(index, argc, argv, option);
     } else if (option == "--csv") {
@@ -369,13 +366,12 @@ void validate(const Config &config) {
   in_addr address{};
   if (::inet_pton(AF_INET, config.target.c_str(), &address) != 1)
     throw std::invalid_argument("target must be an IPv4 literal");
-  if (config.allowlist.empty())
-    throw std::invalid_argument("test requires at least one --allow-cidr");
-  if (std::ranges::none_of(config.allowlist, [&](const CidrV4 &cidr) {
+  if (!config.allowlist.empty() &&
+      std::ranges::none_of(config.allowlist, [&](const CidrV4 &cidr) {
         return cidr.contains(config.target);
       }))
     throw std::invalid_argument(
-        "target is not inside an explicit --allow-cidr");
+        "target is not inside the configured destination CIDR allowlist");
   if (config.duration <= std::chrono::milliseconds::zero() ||
       config.duration > config.limits.duration)
     throw std::invalid_argument("duration exceeds the runtime safety limit");
@@ -433,11 +429,11 @@ void validate(const Config &config) {
 std::string usage() {
   return R"(NETBENCH v0.2.0
 Usage:
-  netbench tcp  --target IPv4 --allow-cidr CIDR --port PORT
+  netbench tcp  --target IPv4 --port PORT
                 --connections N --rate Ncps --duration TIME [options]
-  netbench udp  --target IPv4 --allow-cidr CIDR --port PORT
+  netbench udp  --target IPv4 --port PORT
                 --pps N --size BYTES --duration TIME [options]
-  netbench icmp --target IPv4 --allow-cidr CIDR
+  netbench icmp --target IPv4
                 --rate Npps --duration TIME [options]
   netbench validate-source --target IPv4 --interface IFACE --spoof-source
                 --source-ip IPv4 --source-allow-cidr CIDR
@@ -451,7 +447,7 @@ Options:
   --max-pps N --max-bandwidth RATE --max-connection-rate Ncps
   --max-concurrency N --max-duration TIME
 
-Every target must match an explicit --allow-cidr. IPv4 literals only.
+TCP, UDP, and ICMP accept any IPv4 literal target.
 validate-source is limited to allowlisted RFC 1918 lab networks and interfaces.
 )";
 }

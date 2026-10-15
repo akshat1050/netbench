@@ -132,11 +132,11 @@ void test_cli() {
   CHECK(config.json_path == "validation.json");
   check_throws([] {
     (void)parse({"netbench", "udp", "--target", "127.0.0.1", "--port", "9000",
-                 "--allow-cidr", "127.0.0.0/8", "--source-ip", "10.0.0.1"});
+                 "--source-ip", "10.0.0.1"});
   });
   check_throws([] {
-    (void)parse({"netbench", "icmp", "--target", "127.0.0.1", "--allow-cidr",
-                 "127.0.0.0/8", "--spoof-source"});
+    (void)parse(
+        {"netbench", "icmp", "--target", "127.0.0.1", "--spoof-source"});
   });
   check_throws([] {
     (void)parse({"netbench", "validate-source", "--target", "10.90.0.2",

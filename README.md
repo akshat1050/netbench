@@ -2,7 +2,7 @@
 
 NetBench is a standalone Linux C++20 CLI for controlled, single-sided IPv4 network resilience
 testing. It needs no target-side agent, NetBench receiver, token, API, or application acknowledgement.
-Every target must match a CIDR explicitly authorized on that command line.
+TCP, UDP, and ICMP accept any IPv4 literal target.
 
 ## What it measures
 
@@ -44,13 +44,13 @@ grant `CAP_NET_RAW` if the OS does not permit either. NetBench itself does not e
 ## Examples
 
 ```bash
-./build/netbench tcp --target 192.0.2.10 --allow-cidr 192.0.2.0/24 \
+./build/netbench tcp --target 192.0.2.10 \
   --port 443 --connections 100 --rate 50cps --duration 30s
 
-./build/netbench udp --target 192.0.2.10 --allow-cidr 192.0.2.0/24 \
+./build/netbench udp --target 192.0.2.10 \
   --port 9000 --pps 1000 --size 512 --duration 30s
 
-./build/netbench icmp --target 192.0.2.10 --allow-cidr 192.0.2.0/24 \
+./build/netbench icmp --target 192.0.2.10 \
   --rate 10pps --duration 30s --json result.json --csv result.csv
 ```
 

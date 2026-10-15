@@ -1,11 +1,11 @@
 # NetBench CLI specification
 
 ```text
-netbench tcp  --target IPv4 --allow-cidr CIDR --port PORT
+netbench tcp  --target IPv4 --port PORT
               --connections N --rate Ncps --duration TIME [options]
-netbench udp  --target IPv4 --allow-cidr CIDR --port PORT
+netbench udp  --target IPv4 --port PORT
               --pps N --size BYTES --duration TIME [options]
-netbench icmp --target IPv4 --allow-cidr CIDR
+netbench icmp --target IPv4
               --rate Npps --duration TIME [options]
 netbench validate-source --target IPv4 --destination-allow-cidr CIDR
               --interface IFACE --allow-interface IFACE --spoof-source
@@ -29,9 +29,8 @@ Common options:
 --max-duration TIME                      Runtime duration safety limit
 ```
 
-`--allow-cidr` is repeatable and mandatory. Targets are IPv4 literals; DNS is deliberately excluded
-so authorization cannot change after validation. Rates accept `pps`, `cps`, `bps`, `kbps`, `mbps`,
-or `gbps` as appropriate. Times accept `ms`, `s`, or `m`.
+Normal traffic targets may be any IPv4 literal. DNS is deliberately excluded. Rates accept `pps`,
+`cps`, `bps`, `kbps`, `mbps`, or `gbps` as appropriate. Times accept `ms`, `s`, or `m`.
 
 TCP `--connections` is the maximum number of simultaneously established/connecting sockets;
 `--rate` paces their creation. UDP `--pps` controls datagram attempts and `--size` controls each

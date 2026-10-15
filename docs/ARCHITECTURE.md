@@ -1,8 +1,8 @@
 # NetBench architecture
 
 NetBench is a single Linux CLI process. It initiates every test locally and never installs or
-contacts a NetBench agent on the target. The target is an IPv4 literal that must match at least one
-`--allow-cidr` supplied for the run.
+contacts a NetBench agent on the target. Normal TCP, UDP, and ICMP targets may be any IPv4 literal;
+source validation retains separate RFC 1918 source and destination allowlists.
 
 ```text
 CLI parser + safety validation

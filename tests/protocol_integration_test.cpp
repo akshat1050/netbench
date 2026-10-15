@@ -28,7 +28,6 @@ netbench::Config base(netbench::Command command) {
   netbench::Config config;
   config.command = command;
   config.target = "127.0.0.1";
-  config.allowlist.push_back(netbench::CidrV4::parse("127.0.0.0/8"));
   config.duration = std::chrono::milliseconds{150};
   config.timeout = std::chrono::milliseconds{100};
   config.recovery = std::chrono::milliseconds{10};
