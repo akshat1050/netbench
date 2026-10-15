@@ -135,7 +135,9 @@ void test_metrics_and_exports() {
   netbench::write_json(json, config, result);
   netbench::write_csv(csv, config, result);
   CHECK(json.str().find("\"protocol\":\"icmp\"") != std::string::npos);
+  CHECK(json.str().find("source_validation") == std::string::npos);
   CHECK(csv.str().find("version,protocol") == 0);
+  CHECK(csv.str().find("actual_local_interface") == std::string::npos);
 }
 
 } // namespace

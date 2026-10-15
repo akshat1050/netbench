@@ -7,6 +7,7 @@
 
 #include "netbench/config.hpp"
 #include "netbench/metrics.hpp"
+#include "netbench/source_validation.hpp"
 
 namespace netbench {
 
@@ -18,6 +19,7 @@ struct TestResult {
   std::optional<LatencySummary> after_responsiveness;
   std::optional<double> packet_loss_percent;
   ResourceUsage resources;
+  std::optional<SourceValidationReport> source_validation{};
 };
 
 using ProgressCallback = std::function<void(const MetricsSnapshot &)>;

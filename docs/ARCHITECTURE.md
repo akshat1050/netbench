@@ -7,10 +7,10 @@ contacts a NetBench agent on the target. The target is an IPv4 literal that must
 ```text
 CLI parser + safety validation
              |
-       selected engine
-      /      |       \
-   TCP      UDP      ICMP
-      \      |       /
+          selected engine
+      /      |       |       \
+   TCP      UDP     ICMP   source validation
+      \      |       |       /
   thread-safe metrics + monotonic timestamps
              |
  terminal progress + terminal/JSON/CSV final report
@@ -20,9 +20,10 @@ CLI parser + safety validation
 
 Every run is bounded by requested values and independently by runtime maximums for packets per
 second, bandwidth, connection rate, established concurrency, and duration. Runtime maximums cannot
-exceed compiled ceilings. Burst profiles are additionally limited to 10 seconds. Source spoofing,
-raw arbitrary packets, reflection helpers, target authentication, and receiver services are outside
-the design.
+exceed compiled ceilings. Burst profiles are additionally limited to 10 seconds. General source
+spoofing, raw arbitrary packets, reflection helpers, target authentication, and receiver services
+are outside the design. The sole exception is the isolated `validate-source` engine described
+below.
 
 Profiles never exceed the requested rate:
 
@@ -55,6 +56,16 @@ error-queue entries provide ICMP destination-unreachable feedback when the kerne
 The engine sends ICMP Echo requests using a Linux ping socket, falling back to a raw ICMP socket
 when permitted. Sequence numbers correlate replies with monotonic send timestamps. Only this engine
 reports packet loss, derived from transmitted requests without matching replies by their timeout.
+
+### Source validation
+
+`SourcePolicy` restricts both endpoints and their CIDRs to RFC 1918, requires exact interface and
+CIDR allowlists, and enforces immutable ceilings of 10 PPS, 30 seconds, and 300 probes.
+`LabEnvironment` verifies the interface, network namespace or virtual-peer isolation, and effective
+`CAP_NET_RAW`. The engine then sends a fixed ICMP Echo packet with deterministic identifiers and
+revalidates the policy and environment before each send. It records sender submission separately
+from correlated local ICMP observations and never infers forwarding or drop behavior without an
+external observer.
 
 ## Concurrency and ownership
 

@@ -11,6 +11,9 @@ add_library(netbench_lib
     src/engines/tcp_engine.cpp
     src/engines/udp_engine.cpp
     src/engines/icmp_engine.cpp
+    src/validation/source_policy.cpp
+    src/validation/lab_environment.cpp
+    src/validation/source_validation.cpp
     src/reporting/terminal.cpp)
 target_include_directories(netbench_lib PUBLIC include)
 target_compile_features(netbench_lib PUBLIC cxx_std_20)
@@ -35,5 +38,18 @@ if(BUILD_TESTING)
   target_link_libraries(netbench_protocol_integration_test PRIVATE netbench_lib)
   add_test(NAME protocols_localhost COMMAND netbench_protocol_integration_test)
   set_tests_properties(protocols_localhost PROPERTIES TIMEOUT 15)
+
+  add_executable(netbench_source_policy_test tests/source_policy_test.cpp)
+  target_link_libraries(netbench_source_policy_test PRIVATE netbench_lib)
+  add_test(NAME source_policy COMMAND netbench_source_policy_test)
+
+  add_executable(netbench_source_validation_integration_test
+                 tests/source_validation_integration_test.cpp)
+  target_link_libraries(netbench_source_validation_integration_test
+                        PRIVATE netbench_lib)
+  add_test(NAME source_validation_namespace
+           COMMAND netbench_source_validation_integration_test)
+  set_tests_properties(source_validation_namespace PROPERTIES
+                       TIMEOUT 15 SKIP_RETURN_CODE 77)
 endif()
 

@@ -2,6 +2,8 @@
 
 #include <iomanip>
 #include <ostream>
+#include <string>
+#include <vector>
 
 namespace netbench {
 namespace {
@@ -32,6 +34,63 @@ void json_latency(std::ostream &output,
          << ",\"p99_ms\":" << latency->p99_ms << '}';
 }
 
+void json_string(std::ostream &output, std::string_view value) {
+  output << '"';
+  for (const char character : value) {
+    switch (character) {
+    case '"':
+      output << "\\\"";
+      break;
+    case '\\':
+      output << "\\\\";
+      break;
+    case '\n':
+      output << "\\n";
+      break;
+    case '\r':
+      output << "\\r";
+      break;
+    case '\t':
+      output << "\\t";
+      break;
+    default:
+      output << character;
+    }
+  }
+  output << '"';
+}
+
+void json_strings(std::ostream &output,
+                  const std::vector<std::string> &values) {
+  output << '[';
+  for (std::size_t index = 0; index < values.size(); ++index) {
+    if (index != 0)
+      output << ',';
+    json_string(output, values[index]);
+  }
+  output << ']';
+}
+
+std::string joined(const std::vector<std::string> &values) {
+  std::string result;
+  for (const auto &value : values) {
+    if (!result.empty())
+      result += "; ";
+    result += value;
+  }
+  return result;
+}
+
+void csv_cell(std::ostream &output, std::string_view value) {
+  output << '"';
+  for (const char character : value) {
+    if (character == '"')
+      output << '"';
+    output << character;
+  }
+  output << '"';
+}
+
 } // namespace
 
 void print_progress(std::ostream &output, std::string_view protocol,
@@ -58,8 +117,32 @@ void print_result(std::ostream &output, const Config &config,
     output << ':' << config.port;
   output << '\n'
          << std::setw(29) << "Profile" << ": " << profile_name(config.profile)
-         << '\n'
-         << std::setw(29) << "Attempted operations" << ": "
+         << '\n';
+  if (result.source_validation) {
+    const auto &source = *result.source_validation;
+    output << std::setw(29) << "Actual local interface" << ": "
+           << source.actual_interface << '\n'
+           << std::setw(29) << "Configured source IP" << ": "
+           << source.configured_source_ip << '\n'
+           << std::setw(29) << "Destination IP" << ": " << source.destination_ip
+           << '\n'
+           << std::setw(29) << "Test namespace" << ": " << source.test_namespace
+           << '\n'
+           << std::setw(29) << "Probes transmitted" << ": "
+           << source.probes_transmitted << '\n'
+           << std::setw(29) << "Local errors" << ": "
+           << source.local_errors.size() << '\n'
+           << std::setw(29) << "Response observations" << ": "
+           << source.response_observations.size() << '\n'
+           << std::setw(29) << "Forward/drop externally verified" << ": "
+           << (source.forwarding_drop_externally_verified ? "yes" : "no")
+           << '\n';
+    for (const auto &error : source.local_errors)
+      output << "  local error: " << error << '\n';
+    for (const auto &observation : source.response_observations)
+      output << "  response: " << observation << '\n';
+  }
+  output << std::setw(29) << "Attempted operations" << ": "
          << m.operations_attempted << '\n'
          << std::setw(29) << "Successful submissions" << ": "
          << m.operations_sent << '\n'
@@ -107,6 +190,9 @@ void print_result(std::ostream &output, const Config &config,
   if (result.protocol == "udp")
     output << "UDP submissions are sender-side evidence; receiver loss is not "
               "inferred.\n";
+  if (result.source_validation)
+    output << "Local transmission is not proof that a firewall forwarded or "
+              "dropped a probe.\n";
 }
 
 void write_json(std::ostream &output, const Config &config,
@@ -141,6 +227,25 @@ void write_json(std::ostream &output, const Config &config,
   json_latency(output, result.before_responsiveness);
   output << ",\n  \"after_responsiveness\":";
   json_latency(output, result.after_responsiveness);
+  if (result.source_validation) {
+    const auto &source = *result.source_validation;
+    output << ",\n  \"source_validation\":{\n    \"actual_local_interface\":";
+    json_string(output, source.actual_interface);
+    output << ",\n    \"configured_source_ip\":";
+    json_string(output, source.configured_source_ip);
+    output << ",\n    \"destination_ip\":";
+    json_string(output, source.destination_ip);
+    output << ",\n    \"test_namespace\":";
+    json_string(output, source.test_namespace);
+    output << ",\n    \"probes_transmitted\":" << source.probes_transmitted
+           << ",\n    \"local_errors\":";
+    json_strings(output, source.local_errors);
+    output << ",\n    \"response_observations\":";
+    json_strings(output, source.response_observations);
+    output << ",\n    \"forwarding_drop_externally_verified\":"
+           << (source.forwarding_drop_externally_verified ? "true" : "false")
+           << "\n  }";
+  }
   output << ",\n  \"cpu_percent\":" << result.resources.cpu_percent
          << ",\n  \"peak_memory_kib\":" << result.resources.peak_memory_kib
          << "\n}\n";
@@ -149,21 +254,25 @@ void write_json(std::ostream &output, const Config &config,
 void write_csv(std::ostream &output, const Config &config,
                const TestResult &result) {
   const auto &m = result.metrics;
-  output
-      << "version,protocol,target,port,profile,elapsed_seconds,attempted,"
-         "submitted,responses,bytes_sent,sender_mbps,connections_succeeded,"
-         "connections_failed,timeouts,resets,socket_errors,send_failures,"
-         "icmp_unreachable,packet_loss_percent,latency_p50_ms,latency_p95_ms,"
-         "latency_p99_ms,cpu_percent,peak_memory_kib\n"
-      << "0.2.0," << result.protocol << ',' << config.target << ','
-      << config.port << ',' << profile_name(config.profile) << ','
-      << std::chrono::duration<double>(m.elapsed).count() << ','
-      << m.operations_attempted << ',' << m.operations_sent << ','
-      << m.operations_received << ',' << m.bytes_sent << ','
-      << m.transmit_mbps() << ',' << m.connections_succeeded << ','
-      << m.connections_failed << ',' << m.timeouts << ',' << m.resets << ','
-      << m.socket_errors << ',' << m.local_send_failures << ','
-      << m.icmp_unreachable << ',';
+  output << "version,protocol,target,port,profile,elapsed_seconds,attempted,"
+            "submitted,responses,bytes_sent,sender_mbps,connections_succeeded,"
+            "connections_failed,timeouts,resets,socket_errors,send_failures,"
+            "icmp_unreachable,packet_loss_percent,latency_p50_ms,"
+            "latency_p95_ms,latency_p99_ms,cpu_percent,peak_memory_kib";
+  if (result.source_validation)
+    output << ",actual_local_interface,configured_source_ip,destination_ip,"
+              "test_namespace,probes_transmitted,local_errors,"
+              "response_observations,forwarding_drop_externally_verified";
+  output << '\n'
+         << "0.2.0," << result.protocol << ',' << config.target << ','
+         << config.port << ',' << profile_name(config.profile) << ','
+         << std::chrono::duration<double>(m.elapsed).count() << ','
+         << m.operations_attempted << ',' << m.operations_sent << ','
+         << m.operations_received << ',' << m.bytes_sent << ','
+         << m.transmit_mbps() << ',' << m.connections_succeeded << ','
+         << m.connections_failed << ',' << m.timeouts << ',' << m.resets << ','
+         << m.socket_errors << ',' << m.local_send_failures << ','
+         << m.icmp_unreachable << ',';
   if (result.packet_loss_percent)
     output << *result.packet_loss_percent;
   output << ',';
@@ -173,7 +282,25 @@ void write_csv(std::ostream &output, const Config &config,
   else
     output << ",,";
   output << ',' << result.resources.cpu_percent << ','
-         << result.resources.peak_memory_kib << '\n';
+         << result.resources.peak_memory_kib;
+  if (result.source_validation) {
+    const auto &source = *result.source_validation;
+    output << ',';
+    csv_cell(output, source.actual_interface);
+    output << ',';
+    csv_cell(output, source.configured_source_ip);
+    output << ',';
+    csv_cell(output, source.destination_ip);
+    output << ',';
+    csv_cell(output, source.test_namespace);
+    output << ',' << source.probes_transmitted << ',';
+    csv_cell(output, joined(source.local_errors));
+    output << ',';
+    csv_cell(output, joined(source.response_observations));
+    output << ','
+           << (source.forwarding_drop_externally_verified ? "true" : "false");
+  }
+  output << '\n';
 }
 
 } // namespace netbench

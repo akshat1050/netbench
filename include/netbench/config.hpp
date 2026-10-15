@@ -10,7 +10,7 @@
 
 namespace netbench {
 
-enum class Command { tcp, udp, icmp, help, version };
+enum class Command { tcp, udp, icmp, validate_source, help, version };
 enum class Profile { baseline, sustained, ramp, burst };
 
 struct SafetyLimits {
@@ -32,6 +32,8 @@ class CidrV4 {
 public:
   static CidrV4 parse(std::string_view text);
   [[nodiscard]] bool contains(std::string_view address) const;
+  [[nodiscard]] bool contains_usable_host(std::string_view address) const;
+  [[nodiscard]] bool is_subset_of(const CidrV4 &other) const noexcept;
   [[nodiscard]] const std::string &text() const noexcept { return text_; }
 
 private:
@@ -41,6 +43,12 @@ private:
   std::uint32_t network_{};
   std::uint32_t mask_{};
   std::string text_;
+};
+
+struct SourceAddressConfig {
+  bool spoof{};
+  std::string address;
+  std::vector<CidrV4> allowlist;
 };
 
 struct Config {
@@ -58,6 +66,9 @@ struct Config {
   std::chrono::milliseconds interval{std::chrono::seconds{1}};
   std::size_t payload_size{512};
   std::vector<CidrV4> allowlist;
+  std::string interface;
+  std::vector<std::string> allowed_interfaces;
+  SourceAddressConfig source_address;
   std::string json_path;
   std::string csv_path;
   SafetyLimits limits;

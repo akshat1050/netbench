@@ -1,4 +1,5 @@
 #include "netbench/config.hpp"
+#include "netbench/source_policy.hpp"
 
 #include <arpa/inet.h>
 
@@ -85,6 +86,24 @@ bool CidrV4::contains(std::string_view address_text) const {
   if (::inet_pton(AF_INET, address_string.c_str(), &address) != 1)
     return false;
   return (ntohl(address.s_addr) & mask_) == network_;
+}
+
+bool CidrV4::contains_usable_host(std::string_view address_text) const {
+  in_addr address{};
+  const std::string address_string(address_text);
+  if (::inet_pton(AF_INET, address_string.c_str(), &address) != 1)
+    return false;
+  const auto host_address = ntohl(address.s_addr);
+  if ((host_address & mask_) != network_)
+    return false;
+  return mask_ == 0xffffffffU || mask_ == 0xfffffffeU ||
+         (host_address != network_ && host_address != (network_ | ~mask_));
+}
+
+bool CidrV4::is_subset_of(const CidrV4 &other) const noexcept {
+  const auto last = network_ | ~mask_;
+  return (network_ & other.mask_) == other.network_ &&
+         (last & other.mask_) == other.network_;
 }
 
 std::uint64_t parse_bit_rate(std::string_view text) {
@@ -190,6 +209,8 @@ Config parse_command_line(int argc, char **argv) {
   else if (command == "icmp") {
     config.command = Command::icmp;
     config.payload_size = 56;
+  } else if (command == "validate-source") {
+    config.command = Command::validate_source;
   } else
     throw std::invalid_argument("unknown command: " + std::string(command));
 
@@ -200,6 +221,39 @@ Config parse_command_line(int argc, char **argv) {
       return config;
     } else if (option == "--target") {
       config.target = require_value(index, argc, argv, option);
+    } else if (option == "--interface") {
+      if (config.command != Command::validate_source)
+        throw std::invalid_argument(
+            "--interface is only valid with validate-source");
+      config.interface = require_value(index, argc, argv, option);
+    } else if (option == "--allow-interface") {
+      if (config.command != Command::validate_source)
+        throw std::invalid_argument(
+            "--allow-interface is only valid with validate-source");
+      config.allowed_interfaces.emplace_back(
+          require_value(index, argc, argv, option));
+    } else if (option == "--spoof-source") {
+      if (config.command != Command::validate_source)
+        throw std::invalid_argument(
+            "--spoof-source is only valid with validate-source");
+      config.source_address.spoof = true;
+    } else if (option == "--source-ip") {
+      if (config.command != Command::validate_source)
+        throw std::invalid_argument(
+            "--source-ip is only valid with validate-source");
+      config.source_address.address = require_value(index, argc, argv, option);
+    } else if (option == "--source-allow-cidr") {
+      if (config.command != Command::validate_source)
+        throw std::invalid_argument(
+            "--source-allow-cidr is only valid with validate-source");
+      config.source_address.allowlist.push_back(
+          CidrV4::parse(require_value(index, argc, argv, option)));
+    } else if (option == "--destination-allow-cidr") {
+      if (config.command != Command::validate_source)
+        throw std::invalid_argument(
+            "--destination-allow-cidr is only valid with validate-source");
+      config.allowlist.push_back(
+          CidrV4::parse(require_value(index, argc, argv, option)));
     } else if (option == "--port") {
       const auto value =
           unsigned_value(require_value(index, argc, argv, option), "port");
@@ -250,6 +304,17 @@ Config parse_command_line(int argc, char **argv) {
       config.json_path = require_value(index, argc, argv, option);
     } else if (option == "--csv") {
       config.csv_path = require_value(index, argc, argv, option);
+    } else if (option == "--report") {
+      if (config.command != Command::validate_source)
+        throw std::invalid_argument(
+            "--report is only valid with validate-source");
+      const std::string path(require_value(index, argc, argv, option));
+      if (path.ends_with(".json"))
+        config.json_path = path;
+      else if (path.ends_with(".csv"))
+        config.csv_path = path;
+      else
+        throw std::invalid_argument("--report requires a .json or .csv path");
     } else if (option == "--max-pps") {
       config.limits.pps = unsigned_value(
           require_value(index, argc, argv, option), "maximum PPS");
@@ -277,6 +342,12 @@ Config parse_command_line(int argc, char **argv) {
 }
 
 void validate(const Config &config) {
+  if (config.command != Command::validate_source &&
+      (config.source_address.spoof || !config.source_address.address.empty() ||
+       !config.source_address.allowlist.empty() || !config.interface.empty() ||
+       !config.allowed_interfaces.empty()))
+    throw std::invalid_argument(
+        "source-address options are only valid with validate-source");
   if (config.limits.pps == 0 || config.limits.pps > SafetyLimits::absolute_pps)
     throw std::invalid_argument("maximum PPS exceeds compiled ceiling");
   if (config.limits.bandwidth_bytes_per_second == 0 ||
@@ -354,6 +425,8 @@ void validate(const Config &config) {
             config.bandwidth_bytes_per_second / (config.payload_size + 8U))
       throw std::invalid_argument(
           "ICMP rate and size exceed the bandwidth safety limit");
+  } else if (config.command == Command::validate_source) {
+    SourcePolicy::validate(config);
   }
 }
 
@@ -366,6 +439,10 @@ Usage:
                 --pps N --size BYTES --duration TIME [options]
   netbench icmp --target IPv4 --allow-cidr CIDR
                 --rate Npps --duration TIME [options]
+  netbench validate-source --target IPv4 --interface IFACE --spoof-source
+                --source-ip IPv4 --source-allow-cidr CIDR
+                --destination-allow-cidr CIDR --allow-interface IFACE
+                --pps N --duration TIME [--report FILE.json|FILE.csv]
 
 Options:
   --profile baseline|sustained|ramp|burst
@@ -375,6 +452,7 @@ Options:
   --max-concurrency N --max-duration TIME
 
 Every target must match an explicit --allow-cidr. IPv4 literals only.
+validate-source is limited to allowlisted RFC 1918 lab networks and interfaces.
 )";
 }
 

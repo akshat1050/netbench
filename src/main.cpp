@@ -81,17 +81,20 @@ int main(int argc, char **argv) {
     run_interruptible([&](std::stop_token stop) {
       const netbench::ProgressCallback progress = [&](const auto &snapshot) {
         const std::string_view protocol =
-            config.command == netbench::Command::tcp   ? "tcp"
-            : config.command == netbench::Command::udp ? "udp"
-                                                       : "icmp";
+            config.command == netbench::Command::tcp    ? "tcp"
+            : config.command == netbench::Command::udp  ? "udp"
+            : config.command == netbench::Command::icmp ? "icmp"
+                                                        : "source-validation";
         netbench::print_progress(std::cerr, protocol, snapshot);
       };
       if (config.command == netbench::Command::tcp)
         result = netbench::run_tcp_test(config, stop, progress);
       else if (config.command == netbench::Command::udp)
         result = netbench::run_udp_test(config, stop, progress);
-      else
+      else if (config.command == netbench::Command::icmp)
         result = netbench::run_icmp_test(config, stop, progress);
+      else
+        result = netbench::SourceValidationEngine::run(config, stop, progress);
     });
     if (result) {
       netbench::print_result(std::cout, config, *result);
